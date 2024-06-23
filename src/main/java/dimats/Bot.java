@@ -94,7 +94,6 @@ public class Bot extends TelegramLongPollingBot {
         if (update.hasMessage() && update.getMessage().hasText()) {
             var msg = update.getMessage();
             var id = msg.getChatId();
-            //sendText(hostId, "Msg got, id: " + id.toString());
 
             //Добавление в команду кухни того, кто пишет боту впервые и выключение для него оповещений по умолчанию
             team.putIfAbsent(id, "relax");
@@ -122,7 +121,7 @@ public class Bot extends TelegramLongPollingBot {
                             int flag;
                             if (order.isServed.equals(true)) flag = 0; else flag = 1;
 
-                            String str = markdown[flag][0] + order.name + " x" + order.amount + ", стол #" + order.table + ". Отображено в: " + order.whenGot + markdown[flag][1] + "\n";
+                            String str = markdown[flag][0] + (orders.indexOf(order)+1) + ") " + order.name + " x" + order.amount + ", стол #" + order.table + ". Отображено в: " + order.whenGot + markdown[flag][1] + "\n";
                             summary.append(str);
                         }
                     }
@@ -137,6 +136,7 @@ public class Bot extends TelegramLongPollingBot {
             EditMessageText editMessage = new EditMessageText();
             editMessage.setChatId(String.valueOf(id));
             editMessage.setMessageId(update.getCallbackQuery().getMessage().getMessageId());
+            editMessage.setParseMode("HTML");
 
             switch (contents[0]) {
                 case "gild":
@@ -146,7 +146,6 @@ public class Bot extends TelegramLongPollingBot {
                     break;
                 case "order":
                     editMessage.setText("<strike>" + update.getCallbackQuery().getMessage().getText() + "</strike>");
-                    editMessage.setParseMode("HTML");
                     Order o = orders.get(Integer.parseInt(contents[1]));
                     o.setServed(true);
                     break;
@@ -233,7 +232,7 @@ public class Bot extends TelegramLongPollingBot {
 
         SendMessage sm = new SendMessage();
         sm.setChatId(String.valueOf(chatId));
-        sm.setText("Gild choice");
+        sm.setText("Выбери себе цех:");
         sm.setReplyMarkup(inlineKeyboardMarkup);
 
         return sm;
