@@ -102,15 +102,31 @@ public class Bot extends TelegramLongPollingBot {
             /*Обработка объекта update в зависимости от типа полученных данных*/
 
             if (msg.isCommand()) {
-                if (msg.getText().equals("/start")) {
+                if (msg.getText().equals("/go")) {
                     try {
-                        execute(sendInlineKeyboardMessage(id));
+                        execute(sendGildChoiceMessage(id));
                     } catch (TelegramApiException e) {
                         throw new RuntimeException(e);
                     }
-                } else if (msg.getText().equals("/stop")) {
+                } else if (msg.getText().equals("/bye")) {
                     team.put(id, "relax");
-                    sendText(id, "shift stopped");
+                    sendText(id, "С Днём Закрытия Смены!!!");
+                } else if (msg.getText().equals("/my")) {
+                    StringBuilder summary = new StringBuilder();
+                    for (Order order : orders) {
+                        String[][] markdown = {
+                                {"<strike>" , "</strike>"},
+                                {""         , ""}
+                        };
+                        if (order.gild.equals(team.get(id)) || team.get(id).equals("all")) {
+                            int flag;
+                            if (order.isServed.equals(true)) flag = 0; else flag = 1;
+
+                            String str = markdown[flag][0] + order.name + " x" + order.amount + ", стол #" + order.table + ". Отображено в: " + order.whenGot + markdown[flag][1] + "\n";
+                            summary.append(str);
+                        }
+                    }
+                    sendText(id, summary.toString());
                 }
             }
         }else if (update.hasCallbackQuery()) {
@@ -118,30 +134,35 @@ public class Bot extends TelegramLongPollingBot {
             String[] contents = call_data.split(" "); //call_data must be a string, which contains to words, separated by a space
             Long id = update.getCallbackQuery().getMessage().getChatId();
 
+            EditMessageText editMessage = new EditMessageText();
+            editMessage.setChatId(String.valueOf(id));
+            editMessage.setMessageId(update.getCallbackQuery().getMessage().getMessageId());
+
             switch (contents[0]) {
                 case "gild":
                     team.put(id, contents[1]);
                     sendText(hostId, "call_data: " + contents[1] + " is set for " + id + ". (username: " + update.getCallbackQuery().getFrom().getUserName() +")");
+                    editMessage.setText("<b>Выбран цех: " + contents[1] + "</b>");
                     break;
                 case "order":
-                    EditMessageText editMessage = new EditMessageText();
-                    editMessage.setChatId(String.valueOf(id));
-                    editMessage.setMessageId(update.getCallbackQuery().getMessage().getMessageId());
                     editMessage.setText("<strike>" + update.getCallbackQuery().getMessage().getText() + "</strike>");
                     editMessage.setParseMode("HTML");
-
-                    try {
-                        execute(editMessage);
-                    } catch (TelegramApiException ex) { logger.log(Level.WARNING, ex.getMessage());  }
+                    Order o = orders.get(Integer.parseInt(contents[1]));
+                    o.setServed(true);
                     break;
             }
+            try {
+                execute(editMessage);
+            } catch (TelegramApiException ex) { logger.log(Level.WARNING, ex.getMessage());  }
         }
     }
 
     public void sendText(Long who, String what){
         SendMessage sm = SendMessage.builder()
                 .chatId(who.toString()) //Who are we sending a message to
-                .text(what).build();    //Message content
+                .text(what)    //Message content
+                .parseMode("HTML") //Markdown mode
+                .build();
         try {
             execute(sm);                        //Actually sending the message
         } catch (TelegramApiException e) {
@@ -163,7 +184,7 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    public static SendMessage sendInlineKeyboardMessage(long chatId) {
+    public static SendMessage sendGildChoiceMessage(long chatId) {
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
 
         InlineKeyboardButton inlineKeyboardButton0 = new InlineKeyboardButton();
@@ -238,11 +259,11 @@ public class Bot extends TelegramLongPollingBot {
                 String gild = row.get(2);
                 int amount = Integer.parseInt(row.get(3));
                 int table = Integer.parseInt(row.get(4));
-                long millis = Long.parseLong(row.get(5));
+                String whenGot = row.get(5);
                 boolean isPosted = false;
                 boolean isServed = false;
 
-                Order order = new Order(id, name, gild, amount, table, millis, isPosted, isServed);
+                Order order = new Order(id, name, gild, amount, table, whenGot, isPosted, isServed);
                 orders.add(order);
             }
         } catch (NumberFormatException e){
@@ -270,7 +291,7 @@ public class Bot extends TelegramLongPollingBot {
         InlineKeyboardMarkup ikm = new InlineKeyboardMarkup();
         InlineKeyboardButton ikb = new InlineKeyboardButton();
         ikb.setText("Отдано");
-        ikb.setCallbackData("order " + order.id);
+        ikb.setCallbackData("order " + orders.indexOf(order));
 
         List<InlineKeyboardButton> row = new ArrayList<>();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
