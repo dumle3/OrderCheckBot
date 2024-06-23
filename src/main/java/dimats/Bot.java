@@ -21,11 +21,14 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.*;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 
 public class Bot extends TelegramLongPollingBot {
 
     Map<Long, String> team = new HashMap<>();
+    private static final Logger logger = Logger.getLogger("MyLogger");
     Timer timer = new Timer();
     Long hostId = 679672958L;
     List<Order> orders = new ArrayList<>();
@@ -33,8 +36,8 @@ public class Bot extends TelegramLongPollingBot {
     String ordersListTxt = "C://Users/dimcu/IdeaProjects/OrderCheckBot/src/list.txt";
 
     public Bot() {
-        /**Следим за выходящими заказами, регулярно проверяя файл list.txt с помощью функции getOrders(fn);
-         * и, при их наличии, помещаем новые в лист заказов orders, отправляем ожидающим работникам и удаляем из файла **/
+        /*Следим за выходящими заказами, регулярно проверяя файл list.txt с помощью функции getOrders(fn);
+         * и, при их наличии, помещаем новые в лист заказов orders, отправляем ожидающим работникам и удаляем из файла */
         TimerTask periodOrderCheck = new TimerTask() {
             public void run() {
                 getOrders();
@@ -96,7 +99,7 @@ public class Bot extends TelegramLongPollingBot {
             //Добавление в команду кухни того, кто пишет боту впервые и выключение для него оповещений по умолчанию
             team.putIfAbsent(id, "relax");
 
-            /**Обработка объекта update в зависимости от типа полученных данных**/
+            /*Обработка объекта update в зависимости от типа полученных данных*/
 
             if (msg.isCommand()) {
                 if (msg.getText().equals("/start")) {
@@ -129,7 +132,7 @@ public class Bot extends TelegramLongPollingBot {
 
                     try {
                         execute(editMessage);
-                    } catch (TelegramApiException ex) { ex.printStackTrace(); }
+                    } catch (TelegramApiException ex) { logger.log(Level.WARNING, ex.getMessage());  }
                     break;
             }
         }
@@ -147,19 +150,17 @@ public class Bot extends TelegramLongPollingBot {
     }
 
     private String fileToStr(String filename) {
-        FileReader fr;
-        String s = "";
-        try {
-            fr = new FileReader(filename);
+        try (FileReader fr = new FileReader(filename)){
             int c;
+            StringBuilder result = new StringBuilder();
 
             while((c=fr.read())!=-1){
-                s += (char)c;
+                result.append((char)c);
             }
+            return result.toString();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return s;
     }
 
     public static SendMessage sendInlineKeyboardMessage(long chatId) {
@@ -245,7 +246,7 @@ public class Bot extends TelegramLongPollingBot {
                 orders.add(order);
             }
         } catch (NumberFormatException e){
-            e.printStackTrace();
+            logger.log(Level.WARNING, e.getMessage());
         }
 
         try {
@@ -257,12 +258,14 @@ public class Bot extends TelegramLongPollingBot {
             BufferedWriter bw = new BufferedWriter(new FileWriter(f.getAbsoluteFile(), false));
                 //Auto clearing the file and "writing".
             bw.close();
-        } catch (IOException e) { e.printStackTrace(); }
+        } catch (IOException e) { logger.log(Level.WARNING, e.getMessage()); }
     }
 
     private SendMessage sendOrder(Order order, long chatId){
         Calendar now = Calendar.getInstance();
-        String txt = order.name + " x" + order.amount + ", стол #" + order.table + ". Заказано: " + now.get(Calendar.HOUR_OF_DAY) + ":" + now.get(Calendar.MINUTE);
+        String h = String.format("%02d:", now.get(Calendar.HOUR_OF_DAY));
+        String m = String.format("%02d", now.get(Calendar.MINUTE));
+        String txt = order.name + " x" + order.amount + ", стол #" + order.table + ". Отображено в: " + h + m;
 
         InlineKeyboardMarkup ikm = new InlineKeyboardMarkup();
         InlineKeyboardButton ikb = new InlineKeyboardButton();
